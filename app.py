@@ -11,14 +11,27 @@ from machine import Pin
 
 PORT = 80
 AUTO_UPDATE_SECONDS = 60
-BUILD_ID = "dashboard-v5"
+BUILD_ID = "dashboard-v6"
 
 led = Pin("LED", Pin.OUT)
 blink_enabled = False
 manual_led = True
 update_running = False
 last_update_result = "Not checked since startup"
+webrepl_state = "Not started"
 led.on()
+
+
+try:
+    import webrepl
+    from secrets import WEBREPL_PASSWORD
+
+    webrepl.start(password=WEBREPL_PASSWORD)
+    webrepl_state = "Running on port 8266"
+    print("WebREPL file management is running on port 8266")
+except Exception as error:
+    webrepl_state = "Unavailable"
+    print("WebREPL could not start:", error)
 
 
 def _wlan():
@@ -98,6 +111,7 @@ def _page(message=""):
     <p>LED: <span class="value">{led_state}</span></p>
     <p>Updater: <span class="value">{update_state}</span></p>
     <p>Last check: <span class="value">{last_update}</span></p>
+    <p>File management: <span class="value">{webrepl_state}</span></p>
   </section>
 
   <section class="card">
@@ -132,6 +146,7 @@ def _page(message=""):
         led_state=led_state,
         update_state=update_state,
         last_update=last_update_result,
+        webrepl_state=webrepl_state,
     )
 
 
