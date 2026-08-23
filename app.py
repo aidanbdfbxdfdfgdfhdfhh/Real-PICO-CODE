@@ -1,3 +1,8 @@
+import network
+
+import ota
+import wifi
+
 from machine import Pin, PWM
 from time import sleep
 
@@ -7,6 +12,7 @@ onboard_test = True
 rgb_test = False
 button_test = False
 rgb_button_test = False
+auto_update_check_seconds = 60
 
 
 if onboard_test:
@@ -40,6 +46,22 @@ if button_test:
     while True:
         red_led.value(button.value() == 0)
         sleep(0.01)
+
+
+# Keep checking GitHub after the hardware test finishes. Changing GitHub's
+# version.txt makes ota.check_for_update() install app.py and restart the Pico.
+if not button_test and not rgb_button_test:
+    print("Automatic OTA checks every", auto_update_check_seconds, "seconds")
+
+    while True:
+        sleep(auto_update_check_seconds)
+
+        wlan = network.WLAN(network.STA_IF)
+        if not wlan.isconnected():
+            wlan = wifi.connect()
+
+        if wlan is not None and wlan.isconnected():
+            ota.check_for_update()
 
 
 if rgb_button_test:
