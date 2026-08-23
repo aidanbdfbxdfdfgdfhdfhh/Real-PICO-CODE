@@ -11,11 +11,13 @@ from machine import Pin
 
 PORT = 80
 AUTO_UPDATE_SECONDS = 60
+BUILD_ID = "dashboard-v5"
 
 led = Pin("LED", Pin.OUT)
 blink_enabled = False
 manual_led = True
 update_running = False
+last_update_result = "Not checked since startup"
 led.on()
 
 
@@ -60,6 +62,11 @@ def _page(message=""):
     .sub {{ color: #9fb0c0; margin-top: 0; }}
     .card {{ background: #1a2430; border: 1px solid #334355;
             border-radius: 12px; margin: 14px 0; padding: 16px; }}
+    .version-card {{ background: #173727; border: 2px solid #55d68b;
+                     text-align: center; }}
+    .version-number {{ color: #7dffaf; font-size: 42px; font-weight: bold;
+                       margin: 6px 0; }}
+    .build {{ color: #b9c7d4; font-family: monospace; }}
     .grid {{ display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }}
     .value {{ color: #78dba9; font-weight: bold; }}
     button {{ width: 100%; padding: 13px; border: 0; border-radius: 9px;
@@ -77,14 +84,20 @@ def _page(message=""):
   <p class="sub">Local management website</p>
   {message}
 
+  <section class="card version-card">
+    <div>INSTALLED SOFTWARE</div>
+    <div class="version-number">VERSION {version}</div>
+    <div class="build">Build: {build_id}</div>
+  </section>
+
   <section class="card">
     <h2>Status</h2>
     <p>Wi-Fi: <span class="value">{wifi_state}</span></p>
     <p>IP: <span class="value">{ip}</span></p>
     <p>Signal: <span class="value">{signal}</span></p>
-    <p>Version: <span class="value">{version}</span></p>
     <p>LED: <span class="value">{led_state}</span></p>
     <p>Updater: <span class="value">{update_state}</span></p>
+    <p>Last check: <span class="value">{last_update}</span></p>
   </section>
 
   <section class="card">
@@ -115,8 +128,10 @@ def _page(message=""):
         ip=ip_address,
         signal=signal,
         version=local_version,
+        build_id=BUILD_ID,
         led_state=led_state,
         update_state=update_state,
+        last_update=last_update_result,
     )
 
 
@@ -146,7 +161,7 @@ async def _restart_later():
 
 
 async def _check_update_later():
-    global update_running
+    global last_update_result, update_running
 
     await asyncio.sleep(0.2)
     update_running = True
@@ -156,8 +171,30 @@ async def _check_update_later():
         if not wlan.isconnected():
             wlan = wifi.connect()
 
-        if wlan is not None and wlan.isconnected():
-            ota.check_for_update()
+        if wlan is None or not wlan.isconnected():
+            last_update_result = "Failed: Wi-Fi is disconnected"
+            return
+
+        local_version = ota.get_local_version()
+
+        try:
+            remote_version = ota._download_text(ota.VERSION_URL).strip()
+        except Exception as error:
+            print("Update check failed:", error)
+            last_update_result = "Failed to contact GitHub"
+            return
+
+        if not ota._valid_version(remote_version):
+            last_update_result = "Failed: GitHub version is invalid"
+            return
+
+        if remote_version == local_version:
+            last_update_result = "Up to date: version {}".format(local_version)
+            return
+
+        last_update_result = "Installing version {}".format(remote_version)
+        if not ota.update(remote_version):
+            last_update_result = "Failed to install version {}".format(remote_version)
     finally:
         update_running = False
         gc.collect()
