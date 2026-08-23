@@ -8,12 +8,15 @@ from time import sleep
 
 
 # Enable only the hardware test you want to run.
-onboard_test = True
+onboard_test = False
 rgb_test = False
 button_test = False
 rgb_button_test = False
 auto_update_check_seconds = 60
 
+
+On_bored_led = Pin("LED", Pin.OUT)
+On_bored_led.on()
 
 if onboard_test:
     onboard_led = Pin("LED", Pin.OUT)
