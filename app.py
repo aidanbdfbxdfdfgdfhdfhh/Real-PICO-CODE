@@ -6,7 +6,7 @@ onboard_led = Pin("LED", Pin.OUT)
 onboard_led.on()
 
 buttons = [Pin(pin, Pin.IN, Pin.PULL_UP) for pin in (11, 12, 13, 14, 15)]
-leds = [Pin(pin, Pin.OUT) for pin in (1, 2, 3, 4, 5)]
+leds = [Pin(pin, Pin.OUT) for pin in (0,1, 2, 3, 4)]
 
 # Keep GP15 as the counter button until the buttons are mapped.
 button = buttons[4]
