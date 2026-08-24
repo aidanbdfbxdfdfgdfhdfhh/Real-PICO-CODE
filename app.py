@@ -1,41 +1,33 @@
 from machine import Pin
-from time import sleep
-
-on_off_led = Pin("LED",Pin.OUT)
-on_off_led.on()
-
+from time import sleep_ms
 
 
 button = Pin(15, Pin.IN, Pin.PULL_UP)
-leds = [Pin(pin, Pin.OUT) for pin in (0, 1,)]
+leds = [Pin(0, Pin.OUT), Pin(1, Pin.OUT)]
 
 
-
-num = 0
-
-def update_led(num):
-
-    biner = [int(x) for x in f"{num:02b}"]
-
-    led = -1
-    for item in biner:
-        led += 1
-        if item == 1:
-            leds[led].on()
-        if item == 0:
-            leds[led].off()
+def display_number(number):
+    for position, led in enumerate(leds):
+        bit = (number >> position) & 1
+        led.value(bit)
 
 
-update_led(num)
+def wait_for_release():
+    while button.value() == 0:
+        sleep_ms(10)
+
+    sleep_ms(20)
+
+
+count = 0
+display_number(count)
+print("Count:", count)
 
 while True:
-    while button.value() == 1:
-        sleep(0.1)
-    num += 1
+    if button.value() == 0:
+        count = (count + 1) % 4
+        display_number(count)
+        print("Count:", count)
+        wait_for_release()
 
-    if num > 3:
-        num = 0
-
-    update_led(num)
-    while button.value() == 0:
-        sleep(0.01)
+    sleep_ms(10)
