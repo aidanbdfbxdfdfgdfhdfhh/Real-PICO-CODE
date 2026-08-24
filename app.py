@@ -2,6 +2,9 @@ from machine import Pin
 from time import sleep_ms
 
 
+onboard_led = Pin("LED", Pin.OUT)
+onboard_led.on()
+
 button = Pin(15, Pin.IN, Pin.PULL_UP)
 leds = [Pin(pin, Pin.OUT) for pin in (0, 1, 2, 3)]
 
