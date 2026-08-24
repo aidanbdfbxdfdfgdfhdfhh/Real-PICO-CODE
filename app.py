@@ -3,7 +3,7 @@ from time import sleep_ms
 
 
 button = Pin(15, Pin.IN, Pin.PULL_UP)
-leds = [Pin(0, Pin.OUT), Pin(1, Pin.OUT)]
+leds = [Pin(pin, Pin.OUT) for pin in (0, 1, 2, 3)]
 
 
 def display_number(number):
@@ -25,7 +25,7 @@ print("Count:", count)
 
 while True:
     if button.value() == 0:
-        count = (count + 1) % 4
+        count = (count + 1) % 16
         display_number(count)
         print("Count:", count)
         wait_for_release()
