@@ -128,7 +128,11 @@ while True:
 
 
     if button.value() == 0:
-        count = (count + 1) % 32
+        if decrease_mode:
+            count = (count - 1) % 32
+        else:
+            count = (count + 1) % 32
+
         display_number(count)
         print("Count:", count)
         wait_for_release()
