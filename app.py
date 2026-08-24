@@ -1,25 +1,85 @@
 from machine import Pin
 from time import sleep
 
+morse_code_dict = {
+    "A": ".-",
+    "B": "-...",
+    "C": "-.-.",
+    "D": "-..",
+    "E": ".",
+    "F": "..-.",
+    "G": "--.",
+    "H": "....",
+    "I": "..",
+    "J": ".---",
+    "K": "-.-",
+    "L": ".-..",
+    "M": "--",
+    "N": "-.",
+    "O": "---",
+    "P": ".--.",
+    "Q": "--.-",
+    "R": ".-.",
+    "S": "...",
+    "T": "-",
+    "U": "..-",
+    "V": "...-",
+    "W": ".--",
+    "X": "-..-",
+    "Y": "-.--",
+    "Z": "--..",
+    "0": "-----",
+    "1": ".----",
+    "2": "..---",
+    "3": "...--",
+    "4": "....-",
+    "5": ".....",
+    "6": "-....",
+    "7": "--...",
+    "8": "---..",
+    "9": "----.",
+}
 
 onboard_led = Pin("LED", Pin.OUT)
 
-def morse_code(timeings):
+UNIT = 0.5
 
-    for i in timeings:
-        if i == "-":
-            t = 1
-        if i == ".":
-            t = 0.5
-        onboard_led.on()
-        sleep(t)
+
+def flash(symbol):
+    onboard_led.on()
+
+    if symbol == ".":
+        sleep(UNIT)
+    else:
+        sleep(UNIT * 3)
+
+    onboard_led.off()
+
+
+def morse_code(sentence):
+    words = sentence.upper().split()
+
+    try:
+        for word_number, word in enumerate(words):
+            letters = [letter for letter in word if letter in morse_code_dict]
+
+            for letter_number, letter in enumerate(letters):
+                symbols = morse_code_dict[letter]
+
+                for symbol_number, symbol in enumerate(symbols):
+                    flash(symbol)
+
+                    if symbol_number < len(symbols) - 1:
+                        sleep(UNIT)       # Gap between dots and dashes
+
+                if letter_number < len(letters) - 1:
+                    sleep(UNIT * 3)       # Gap between letters
+
+            if word_number < len(words) - 1:
+                sleep(UNIT * 7)           # Gap between words
+    finally:
         onboard_led.off()
-        sleep(t)
-
-timeing = "...---..."
-
-morse_code(timeing)
 
 
-
-onboard_led.off()
+message = "SOS"
+morse_code(message)
