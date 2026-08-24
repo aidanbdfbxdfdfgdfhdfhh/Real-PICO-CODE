@@ -40,20 +40,20 @@ morse_code_dict = {
     "9": "----.",
 }
 
-onboard_led = Pin("LED", Pin.OUT)
+led = Pin(1, Pin.OUT)
 
 UNIT = 0.5
 
 
 def flash(symbol):
-    onboard_led.on()
+    led.on()
 
     if symbol == ".":
         sleep(UNIT)
     else:
         sleep(UNIT * 3)
 
-    onboard_led.off()
+    led.off()
 
 
 def morse_code(sentence):
@@ -78,7 +78,7 @@ def morse_code(sentence):
             if word_number < len(words) - 1:
                 sleep(UNIT * 7)           # Gap between words
     finally:
-        onboard_led.off()
+        led.off()
 
 
 message = "SOS"
