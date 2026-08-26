@@ -49,6 +49,7 @@ def color(rgb):
     green.duty_u16(g * 257)
     blue.duty_u16(b * 257)
 
+color([165, 42, 42])
 
 # Indicator LED/output
 sing = Pin(19, Pin.OUT)
