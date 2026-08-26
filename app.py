@@ -129,9 +129,9 @@ while True:
 
     if button.value() == 0:
         if decrease_mode:
-            count = (count - 1) % 32
+            count = (count - 1) % 64
         else:
-            count = (count + 1) % 32
+            count = (count + 1) % 64
 
         display_number(count)
         print("Count:", count)
