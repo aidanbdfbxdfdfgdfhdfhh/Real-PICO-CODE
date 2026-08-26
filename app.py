@@ -62,7 +62,7 @@ r, g, b = [
     for i in range(11, 14)
 ]
 
-num = 30
+num = 10
 rgb_list = [0, 0, 0]
 
 # False = increase
