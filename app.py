@@ -49,7 +49,14 @@ def color(rgb):
     green.duty_u16(g * 257)
     blue.duty_u16(b * 257)
 
-color([165, 42, 42])
+color([255, 0, 0])   # MUST be RED
+sleep(2)
+
+color([0, 255, 0])   # MUST be GREEN
+sleep(2)
+
+color([0, 0, 255])   # MUST be BLUE
+sleep(2)
 
 # Indicator LED/output
 sing = Pin(19, Pin.OUT)
