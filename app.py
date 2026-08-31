@@ -12,11 +12,11 @@ from rp2 import PIO, StateMachine, asm_pio
 # -------------------------------------------------------
 # Raspberry Pi Pico VGA SYNC TEST
 #
-# VGA pin 13 -> GP14  H-Sync
-# VGA pin 14 -> GP15  V-Sync
+# VGA pin 1  -> GP13 through the two series resistors  RED
+# VGA pin 13 -> GP14                              H-Sync
+# VGA pin 14 -> GP15                              V-Sync
 #
-# Red is NOT controlled by the Pico yet.
-# Red stays connected to 3.3V through your resistors.
+# GP0, GP1 and GP2 are not used.
 # -------------------------------------------------------
 
 
@@ -57,6 +57,7 @@ led.on()
 
 HSYNC_FREQ = 25_175_000
 VSYNC_FREQ = 125_000_000
+RED_FREQ = 25_175_000
 
 
 # -------------------------------------------------------
@@ -119,6 +120,7 @@ def vsync_program():
 
     label("visible")
     wait(1, irq, 0)
+    irq(1)
     jmp(x_dec, "visible")
 
     # 10-line front porch
@@ -147,6 +149,33 @@ def vsync_program():
 
 
 # -------------------------------------------------------
+# SOLID RED VIDEO
+#
+# GP13 -> two 220 ohm resistors in series -> VGA pin 1
+#
+# Red is high for 640 pixel clocks and low during blanking.
+# IRQ 1 comes from the V-Sync program only on visible lines.
+# -------------------------------------------------------
+
+@asm_pio(set_init=PIO.OUT_LOW)
+def red_program():
+    # 637 gives 638 loop cycles. Together with set + mov, red stays
+    # high for exactly 640 PIO clocks.
+    pull(block)
+
+    wrap_target()
+    wait(1, irq, 1)
+    set(pins, 1)
+    mov(x, osr)
+
+    label("visible_red")
+    jmp(x_dec, "visible_red")
+
+    set(pins, 0)
+    wrap()
+
+
+# -------------------------------------------------------
 # CREATE STATE MACHINES
 # -------------------------------------------------------
 
@@ -166,6 +195,14 @@ vsync = StateMachine(
 )
 
 
+red = StateMachine(
+    2,
+    red_program,
+    freq=RED_FREQ,
+    set_base=Pin(13)
+)
+
+
 # -------------------------------------------------------
 # LOAD TIMING COUNTERS
 # -------------------------------------------------------
@@ -176,9 +213,12 @@ hsync.put(655)
 # 0..479 = 480 visible lines
 vsync.put(479)
 
+# 1 set cycle + 1 mov cycle + 638 loop cycles = 640 red clocks
+red.put(637)
 
-# Start V-Sync first.
-# It will wait for H-Sync.
+
+# Red waits for V-Sync, and V-Sync waits for H-Sync.
+red.active(1)
 vsync.active(1)
 
 # Now start H-Sync
@@ -188,6 +228,7 @@ hsync.active(1)
 print("")
 print("VGA TEST RUNNING")
 print("----------------")
+print("GP13 -> resistors -> VGA pin 1 RED")
 print("GP14 -> VGA pin 13 H-Sync")
 print("GP15 -> VGA pin 14 V-Sync")
 print("Target: 640x480 @ ~60 Hz")
