@@ -1,6 +1,8 @@
 from machine import Pin
 import time
 
+on_bored_led = Pin("led",Pin.OUT)
+
 row1 = Pin(0, Pin.OUT)
 
 col1 = Pin(3, Pin.OUT)
