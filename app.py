@@ -1,12 +1,16 @@
 import machine
+import time
 from machine import Pin
 from rp2 import PIO, StateMachine, asm_pio
 
 
 # LED = program running
 led = Pin("LED", Pin.OUT)
-led.on()
-
+for i in range(3):
+    led.on()
+    time.sleep(1)
+    led.off()
+    time.sleep(1) 
 
 # 640x480 @ ~60 Hz VGA timing
 HSYNC_FREQ = 25_175_000
