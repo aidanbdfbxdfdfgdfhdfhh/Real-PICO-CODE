@@ -1,21 +1,17 @@
 
 
 import machine
+import network
 import time
+
+import ota
+import wifi
 
 from machine import Pin
 from rp2 import PIO, StateMachine, asm_pio
 
 
-# LED = program running
-led = Pin("LED", Pin.OUT)
-for i in range(3):
-    led.on()
-    time.sleep(1)
-    led.off()
-    time.sleep(1) 
 
-led.on()
 
 # -------------------------------------------------------
 # Raspberry Pi Pico VGA SYNC TEST
@@ -65,6 +61,7 @@ led.on()
 
 HSYNC_FREQ = 25_175_000
 VSYNC_FREQ = 125_000_000
+AUTO_UPDATE_CHECK_MS = 60_000
 
 
 # -------------------------------------------------------
@@ -199,10 +196,25 @@ print("----------------")
 print("GP14 -> VGA pin 13 H-Sync")
 print("GP15 -> VGA pin 14 V-Sync")
 print("Target: 640x480 @ ~60 Hz")
+print("Automatic WiFi update checks every 60 seconds")
 print("")
 print("Leave this program running.")
 
 
-# Keep Pico alive
+# Keep Pico alive and preserve the project's automatic WiFi updates.
+# The PIO state machines continue generating VGA while the CPU checks GitHub.
+last_update_check = time.ticks_ms()
+
 while True:
-    machine.idle()
+    time.sleep_ms(100)
+
+    if time.ticks_diff(time.ticks_ms(), last_update_check) >= AUTO_UPDATE_CHECK_MS:
+        wlan = network.WLAN(network.STA_IF)
+
+        if not wlan.isconnected():
+            wlan = wifi.connect()
+
+        if wlan is not None and wlan.isconnected():
+            ota.check_for_update()
+
+        last_update_check = time.ticks_ms()
