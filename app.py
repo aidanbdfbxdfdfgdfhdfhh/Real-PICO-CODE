@@ -15,6 +15,8 @@ for i in range(3):
     led.off()
     time.sleep(1) 
 
+led.on()
+
 # -------------------------------------------------------
 # Raspberry Pi Pico VGA SYNC TEST
 #
