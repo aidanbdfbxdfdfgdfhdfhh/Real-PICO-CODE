@@ -1,5 +1,8 @@
+
+
 import machine
 import time
+
 from machine import Pin
 from rp2 import PIO, StateMachine, asm_pio
 
@@ -12,32 +15,82 @@ for i in range(3):
     led.off()
     time.sleep(1) 
 
-# 640x480 @ ~60 Hz VGA timing
+# -------------------------------------------------------
+# Raspberry Pi Pico VGA SYNC TEST
+#
+# VGA pin 13 -> GP14  H-Sync
+# VGA pin 14 -> GP15  V-Sync
+#
+# Red is NOT controlled by the Pico yet.
+# Red stays connected to 3.3V through your resistors.
+# -------------------------------------------------------
+
+
+# Make sure Pico is running at normal 125 MHz
+machine.freq(125_000_000)
+
+
+# Turn onboard LED on so we know the program started
+led = Pin("LED", Pin.OUT)
+
+led.off()
+time.sleep(0.2)
+led.on()
+time.sleep(0.2)
+led.off()
+time.sleep(0.2)
+led.on()
+
+
+# Standard VGA 640x480 timing
+#
+# Pixel clock:       25.175 MHz
+#
+# Horizontal:
+# Visible            640
+# Front porch         16
+# Sync                96
+# Back porch          48
+# Total               800
+#
+# Vertical:
+# Visible             480
+# Front porch         10
+# Sync                 2
+# Back porch          33
+# Total               525
+
+
 HSYNC_FREQ = 25_175_000
 VSYNC_FREQ = 125_000_000
 
 
-# --------------------------------------------------
-# H-SYNC
+# -------------------------------------------------------
+# HORIZONTAL SYNC
+#
 # GP14 -> VGA pin 13
-# --------------------------------------------------
+# -------------------------------------------------------
 
 @asm_pio(set_init=PIO.OUT_HIGH)
-def vga_hsync():
+def hsync_program():
 
-    # IMPORTANT:
-    # Load 655 from the TX FIFO into OSR once.
+    # Get the horizontal count from Python
     pull(block)
 
     wrap_target()
 
-    # Active area + front porch
+    # Copy 655 into X
     mov(x, osr)
 
+    # 640 visible pixels
+    # +
+    # 16 pixel front porch
+    #
+    # = 656 clocks
     label("active_front")
     jmp(x_dec, "active_front")
 
-    # 96 pixel clocks LOW
+    # H-Sync LOW for 96 pixel clocks
     set(pins, 0) [31]
     set(pins, 0) [31]
     set(pins, 0) [31]
@@ -46,21 +99,23 @@ def vga_hsync():
     set(pins, 1) [31]
     set(pins, 1) [13]
 
-    # One horizontal line completed
+    # Tell the V-Sync state machine
+    # that one complete horizontal line occurred
     irq(0)
 
     wrap()
 
 
-# --------------------------------------------------
-# V-SYNC
+# -------------------------------------------------------
+# VERTICAL SYNC
+#
 # GP15 -> VGA pin 14
-# --------------------------------------------------
+# -------------------------------------------------------
 
 @asm_pio(sideset_init=(PIO.OUT_HIGH,))
-def vga_vsync():
+def vsync_program():
 
-    # Load 479 visible-line counter
+    # Get 479 from Python
     pull(block)
 
     wrap_target()
@@ -72,60 +127,80 @@ def vga_vsync():
     wait(1, irq, 0)
     jmp(x_dec, "visible")
 
-    # 10 line front porch
+    # 10-line front porch
     set(y, 9)
 
-    label("front")
+    label("front_porch")
     wait(1, irq, 0)
-    jmp(y_dec, "front")
+    jmp(y_dec, "front_porch")
 
-    # 2 line negative sync pulse
+    # V-Sync LOW for 2 lines
     wait(1, irq, 0).side(0)
     wait(1, irq, 0)
 
-    # 33 line back porch
+    # Bring V-Sync HIGH again
+    # and wait through the back porch
     set(y, 31)
 
-    label("back")
+    label("back_porch")
     wait(1, irq, 0).side(1)
-    jmp(y_dec, "back")
+    jmp(y_dec, "back_porch")
 
+    # Final back-porch line
     wait(1, irq, 0)
 
     wrap()
 
 
-# Create state machines
+# -------------------------------------------------------
+# CREATE STATE MACHINES
+# -------------------------------------------------------
+
 hsync = StateMachine(
     0,
-    vga_hsync,
+    hsync_program,
     freq=HSYNC_FREQ,
     set_base=Pin(14)
 )
 
+
 vsync = StateMachine(
     1,
-    vga_vsync,
+    vsync_program,
     freq=VSYNC_FREQ,
     sideset_base=Pin(15)
 )
 
 
-# Give the PIO programs their counters
+# -------------------------------------------------------
+# LOAD TIMING COUNTERS
+# -------------------------------------------------------
+
+# 0..655 = 656 horizontal clocks
 hsync.put(655)
+
+# 0..479 = 480 visible lines
 vsync.put(479)
 
 
-# Start VSYNC first because it waits for HSYNC
+# Start V-Sync first.
+# It will wait for H-Sync.
 vsync.active(1)
+
+# Now start H-Sync
 hsync.active(1)
 
 
-print("VGA sync started")
-print("GP14 = H-Sync")
-print("GP15 = V-Sync")
-print("Target = 640x480 @ 60 Hz")
+print("")
+print("VGA TEST RUNNING")
+print("----------------")
+print("GP14 -> VGA pin 13 H-Sync")
+print("GP15 -> VGA pin 14 V-Sync")
+print("Target: 640x480 @ ~60 Hz")
+print("")
+print("Leave this program running.")
 
 
+# Keep Pico alive
 while True:
     machine.idle()
