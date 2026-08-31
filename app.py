@@ -2,7 +2,7 @@ from machine import Pin, PWM
 from time import sleep
 
 on_board_led = Pin("LED", Pin.OUT)
-
+on_board_led.value(1)
 # VGA 640x480-ish sync test
 
 # Horizontal sync
