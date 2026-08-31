@@ -11,6 +11,7 @@ from rp2 import DMA, PIO, StateMachine, asm_pio
 IMAGE_BYTES = 61_440
 IMAGE_WORDS = IMAGE_BYTES // 4
 SLIDE_SECONDS = 8
+BUTTON_DEBOUNCE_MS = 250
 
 BLACK = 0b000
 BLUE = 0b001
@@ -131,11 +132,12 @@ def load_landscape(target):
         raise ValueError("image_full.bin must be exactly 61440 bytes")
 
 
-def show_stripes(target, colours):
+def show_stripes(target, colours, enabled_colours=WHITE):
     # Each colour is 40 source pixels, doubled by PIO to 80 VGA pixels.
     line = bytearray(128)
     position = 0
     for colour in colours:
+        colour &= enabled_colours
         word = 0
         for pixel in range(10):
             word |= colour << (pixel * 3)
@@ -149,6 +151,31 @@ def show_stripes(target, colours):
         target[start:start + 128] = line
 
 
+def apply_colour_mask(target, enabled_colours):
+    if enabled_colours == WHITE:
+        return
+
+    word_mask = 0
+    for pixel in range(10):
+        word_mask |= enabled_colours << (pixel * 3)
+    mask = ustruct.pack("<I", word_mask)
+
+    for offset in range(0, IMAGE_BYTES, 4):
+        target[offset] &= mask[0]
+        target[offset + 1] &= mask[1]
+        target[offset + 2] &= mask[2]
+        target[offset + 3] &= mask[3]
+
+
+def render_slide(target, slide_number, enabled_colours):
+    colours = SLIDES[slide_number][1]
+    if colours is None:
+        load_landscape(target)
+        apply_colour_mask(target, enabled_colours)
+    else:
+        show_stripes(target, colours, enabled_colours)
+
+
 machine.freq(125_000_000)
 watchdog = machine.WDT(timeout=8000)
 watchdog.feed()
@@ -156,8 +183,15 @@ watchdog.feed()
 image_storage = bytearray(IMAGE_BYTES)
 image_view = memoryview(image_storage)
 
-load_landscape(image_view)
+render_slide(image_view, 0, WHITE)
 print("Loaded image_full.bin:", IMAGE_BYTES, "bytes")
+
+# Buttons connect their GPIO pin to GND when pressed.
+buttons = (
+    ("RED", RED, Pin(16, Pin.IN, Pin.PULL_UP)),
+    ("GREEN", GREEN, Pin(17, Pin.IN, Pin.PULL_UP)),
+    ("BLUE", BLUE, Pin(18, Pin.IN, Pin.PULL_UP)),
+)
 
 # RGB owns PIO0. H/V use free PIO1 state machines beside Pico W Wi-Fi.
 rgb = StateMachine(0, image_program, freq=25_175_000, out_base=Pin(11))
@@ -203,15 +237,34 @@ hsync.active(1)
 
 print("FULL-SCREEN VGA GALLERY RUNNING")
 slide = 0
-while True:
-    print("Slide:", SLIDES[slide][0])
-    for _ in range(SLIDE_SECONDS):
-        watchdog.feed()
-        time.sleep(1)
+enabled_colours = WHITE
+last_button_states = [button.value() for _, _, button in buttons]
+last_button_presses = [time.ticks_add(time.ticks_ms(), -BUTTON_DEBOUNCE_MS)] * 3
+next_slide = time.ticks_add(time.ticks_ms(), SLIDE_SECONDS * 1000)
 
-    slide = (slide + 1) % len(SLIDES)
-    colours = SLIDES[slide][1]
-    if colours is None:
-        load_landscape(image_view)
-    else:
-        show_stripes(image_view, colours)
+while True:
+    now = time.ticks_ms()
+
+    for index, (name, colour_bit, button) in enumerate(buttons):
+        state = button.value()
+        if (
+            state == 0
+            and last_button_states[index] == 1
+            and time.ticks_diff(now, last_button_presses[index])
+            >= BUTTON_DEBOUNCE_MS
+        ):
+            enabled_colours ^= colour_bit
+            last_button_presses[index] = now
+            render_slide(image_view, slide, enabled_colours)
+            status = "ON" if enabled_colours & colour_bit else "OFF"
+            print(name, status)
+        last_button_states[index] = state
+
+    if time.ticks_diff(now, next_slide) >= 0:
+        slide = (slide + 1) % len(SLIDES)
+        render_slide(image_view, slide, enabled_colours)
+        print("Slide:", SLIDES[slide][0])
+        next_slide = time.ticks_add(now, SLIDE_SECONDS * 1000)
+
+    watchdog.feed()
+    time.sleep_ms(20)
